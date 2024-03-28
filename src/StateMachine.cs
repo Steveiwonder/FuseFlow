@@ -4,7 +4,7 @@ using System.Net.NetworkInformation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace StateMachineDemo
+namespace FuseFlow
 {
     // Define a state machine
     public class StateMachine

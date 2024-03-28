@@ -3,7 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace StateMachineDemo
+namespace FuseFlow
 {
     public class Program
     {
@@ -20,7 +20,6 @@ namespace StateMachineDemo
             });
             var serviceProvider = collection.BuildServiceProvider();
             RestartWebAppJob job = new RestartWebAppJob(serviceProvider);
-
             while (!job.IsComplete)
             {
                 await job.Execute(null);

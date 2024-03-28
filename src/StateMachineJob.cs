@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace StateMachineDemo
+namespace FuseFlow
 {
     abstract class StateMachineJob
     {
@@ -36,6 +36,9 @@ namespace StateMachineDemo
                 // set the initial state
                 Logger.LogInformation("Setting state machine initial state");
                 stateMachine.ChangeState(initialStateType);
+
+
+
                 _currentState = stateMachine.CurrentState.Name;
                 Logger.LogInformation($"Initial state set {_currentState}");
             }
@@ -48,6 +51,13 @@ namespace StateMachineDemo
                 Logger.LogInformation("State machine has no state, job is complete");
                 IsComplete = true;
                 return;
+            }
+
+            if (stateMachine.CurrentState is State.WithData)
+            {
+                var stateWithData = stateMachine.CurrentState as State.WithData;
+                var data = stateWithData.GetData();
+                //persist data
             }
             currentState = stateMachine.CurrentState.Name;
             if (currentState != _currentState)
