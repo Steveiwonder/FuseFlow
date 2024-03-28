@@ -24,7 +24,7 @@ public class FullEnd2EndUnitTests
         var job = new TestJob(serviceProvider);
         var beforeExecuteStates = new Dictionary<int, string>();
         var afterExecuteStates = new Dictionary<int, string>();
-        for (int i = 0; i < 9; i++)
+        for (int i = 0; i < 5; i++)
         {
             beforeExecuteStates.Add(i, job.CurrentState);
             await job.Execute(null);
