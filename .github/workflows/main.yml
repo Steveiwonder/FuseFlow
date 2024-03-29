@@ -72,5 +72,4 @@ jobs:
       with:
         tag: ${{ needs.build.outputs.Version }}
         name: Release ${{ needs.build.outputs.Version }}
-        artifacts: "nugetPackage/*"
         token: ${{ secrets.NUGET_API_KEY }}
