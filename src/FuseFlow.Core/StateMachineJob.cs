@@ -58,7 +58,6 @@ public abstract class StateMachineJob
         if (stateMachine.CurrentState is State.WithData)
         {
             var stateWithData = stateMachine.CurrentState as State.WithData;
-            var data = stateWithData.GetData();
             //persist data
         }
         currentState = stateMachine.CurrentState.Name;
