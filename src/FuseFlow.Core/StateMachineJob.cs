@@ -1,7 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
-namespace FuseFlow;
+namespace FuseFlow.Core;
 
 public abstract class StateMachineJob
 {
