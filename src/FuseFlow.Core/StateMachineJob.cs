@@ -5,7 +5,8 @@ namespace FuseFlow.Core;
 public abstract class StateMachineJob : IJob
 {
     protected ILogger Logger;
-    protected StateMachine stateMachine;
+    protected StateMachine StateMachine { get; private set; }
+    protected IDataSerializer DataSerializer { get; private set; }
     public bool IsComplete { get; private set; }
     public string CurrentState { get; private set; }
     protected IJobDetail JobDetail { get; private set; }
@@ -16,7 +17,8 @@ public abstract class StateMachineJob : IJob
     {
         _jobStateStore = serviceProvider.GetRequiredService<IJobStateStore>();
         Logger = serviceProvider.GetRequiredService<ILogger>();
-        stateMachine = new StateMachine(Logger, serviceProvider, () =>
+        DataSerializer = serviceProvider.GetRequiredService<IDataSerializer>();
+        StateMachine = new StateMachine(Logger, serviceProvider, () =>
         {
             return _jobStateStore.GetStateData(JobDetail.JobId);
         }, (data) =>
@@ -37,9 +39,9 @@ public abstract class StateMachineJob : IJob
 
 
         Logger.LogInformation("Executing state machine");
-        await stateMachine.Execute();
+        await StateMachine.Execute();
         Logger.LogInformation("Execution complete");
-        if (stateMachine.CurrentState == null)
+        if (StateMachine.CurrentState == null)
         {
             Logger.LogInformation("State machine has no state, job is complete");
             IsComplete = true;
@@ -48,13 +50,13 @@ public abstract class StateMachineJob : IJob
         }
 
 
-        var currentState = stateMachine.CurrentState.Name;
+        var currentState = StateMachine.CurrentState.Name;
         if (currentState != CurrentState)
         {
             Logger.LogInformation($"State machine has transitioned from {CurrentState} -> {currentState}");
             // the state has transitioned within the call to Execute();
             // store the new state so it can continue if something fails
-            CurrentState = stateMachine.CurrentState.Name;
+            CurrentState = StateMachine.CurrentState.Name;
         }
 
     }
@@ -72,8 +74,8 @@ public abstract class StateMachineJob : IJob
         }
         // set the initial state
         Logger.LogInformation("Setting state machine initial state");
-        stateMachine.ChangeState(initialStateType);
-        CurrentState = stateMachine.CurrentState.Name;
+        StateMachine.ChangeState(initialStateType);
+        CurrentState = StateMachine.CurrentState.Name;
         Logger.LogInformation($"Initial state set {CurrentState}");
 
         return Task.CompletedTask;
