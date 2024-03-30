@@ -75,6 +75,7 @@ public abstract class StateMachineJob : IJob
         stateMachine.ChangeState(initialStateType);
         CurrentState = stateMachine.CurrentState.Name;
         Logger.LogInformation($"Initial state set {CurrentState}");
+
         return Task.CompletedTask;
     }
 }
