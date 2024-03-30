@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FuseFlow.Core;
-public abstract class StateMachineJob
+public abstract class StateMachineJob : IJob
 {
     private string _currentState;
     protected ILogger Logger;
@@ -16,7 +16,7 @@ public abstract class StateMachineJob
     }
 
 
-    public async Task Execute(string currentState)
+    public async Task Execute(CancellationToken stoppingToken, string currentState)
     {
         if (IsComplete)
         {
