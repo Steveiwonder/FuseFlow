@@ -2,10 +2,11 @@ namespace FuseFlow.Core;
 
 public interface IJobDetail
 {
-    public string JobId { get; }
-    public Type JobType { get; }
-    public IJob Job { get; set; }
-    public string State { get; }
-    public string Parameters { get; }
+    string JobId { get; }
+    Type JobType { get; }
+    IJob Job { get; set; }
+    string CurrentState { get; set; }
+    string CurrentStateData { get; set; }
+    string Parameters { get; }
 }
 

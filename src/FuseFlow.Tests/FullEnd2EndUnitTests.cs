@@ -3,6 +3,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using FuseFlow.Core;
+using System.Runtime.CompilerServices;
 namespace FuseFlow.Tests;
 
 public class FullEnd2EndUnitTests
@@ -19,45 +20,50 @@ public class FullEnd2EndUnitTests
         collection.AddSingleton<IJobDispatcher, JobDispatcher>();
         collection.AddSingleton<IJobOrchestrator, JobOrchestrator>();
         collection.AddSingleton<IJobStore, InMemoryJobStore>();
-        collection.AddSingleton<IJobParamSerializer, JsonJobParameterSerializer>();
+        collection.AddSingleton<IDataSerializer, JsonJobParameterSerializer>();
+        collection.AddSingleton<IJobStateStore>((sp) => sp.GetRequiredService<IJobStore>() as InMemoryJobStore);
         collection.AddLogging(configure =>
         {
             configure.AddConsole();
         });
         var serviceProvider = collection.BuildServiceProvider();
 
-
+        var jobOrchestrator = serviceProvider.GetRequiredService<IJobOrchestrator>();
         var jobDispatcher = serviceProvider.GetRequiredService<IJobDispatcher>();
+        var jobStore = serviceProvider.GetRequiredService<IJobStore>();
+        await jobDispatcher.Dispatch<TestJob>("mytestwebapp");
 
-        var job = new TestJob(serviceProvider);
-        var beforeExecuteStates = new Dictionary<int, string>();
-        var afterExecuteStates = new Dictionary<int, string>();
+
+        var states = new List<string>();
+        var stateData = new Dictionary<int, string>();
         CancellationToken cancellationToken = CancellationToken.None;
+        var job = jobStore.GetAllJobs().First();
         for (int i = 0; i < 5; i++)
         {
-            beforeExecuteStates.Add(i, job.CurrentState);
-            await job.Execute(cancellationToken, null);
-            afterExecuteStates.Add(i, job.CurrentState);
+            states.Add(job.CurrentState);
+            await jobOrchestrator.ExecuteAsync(cancellationToken);
+            stateData[i] = job.CurrentStateData;
+            states.Add(job.CurrentState);
         }
 
-        Assert.Null(beforeExecuteStates[0]);
-        Assert.Equal("pendingRestart", afterExecuteStates[0]);
+        Assert.Null(states[0]);
+        Assert.Equal("pendingRestart", states[1]);
 
 
-        Assert.Equal("pendingRestart", beforeExecuteStates[1]);
-        Assert.Equal("pendingRestart", afterExecuteStates[1]);
+        Assert.Equal("pendingRestart", states[2]);
+        Assert.Equal("pendingRestart", states[3]);
 
 
-        Assert.Equal("pendingRestart", beforeExecuteStates[2]);
-        Assert.Equal("restarting", afterExecuteStates[2]);
+        Assert.Equal("pendingRestart", states[4]);
+        Assert.Equal("restarting", states[5]);
 
 
-        Assert.Equal("restarting", beforeExecuteStates[3]);
-        Assert.Equal("starting", afterExecuteStates[3]);
+        Assert.Equal("restarting", states[6]);
+        Assert.Equal("starting", states[7]);
 
 
-        Assert.Equal("starting", beforeExecuteStates[4]);
-        Assert.Null(afterExecuteStates[4]);
+        Assert.Equal("starting", states[8]);
+        Assert.Null(states[9]);
 
 
     }
@@ -65,35 +71,45 @@ public class FullEnd2EndUnitTests
 
 class TestJob : StateMachineJob
 {
-    class State1 : State.WithoutData
+    class State1 : State
     {
 
         private int _executionCount = 0;
-        public State1(ILogger logger)
+        public State1(ILogger logger, IDataSerializer dataSerializer)
         {
             _logger = logger;
+            _dataSerializer = dataSerializer;
         }
 
         private readonly ILogger _logger;
-
+        private readonly IDataSerializer _dataSerializer;
 
         public override string Name => "pendingRestart";
 
 
-        public override Task Execute(StateMachine stateMachine)
+        public override async void Enter(StateMachine stateMachine)
+        {
+            var data = stateMachine.GetStateData();
+            if (!string.IsNullOrEmpty(data))
+            {
+                _executionCount = await _dataSerializer.Deserialize<int>(stateMachine.GetStateData());
+            }
+        }
+
+        public override async Task Execute(StateMachine stateMachine)
         {
             _executionCount++;
             if (_executionCount >= 3)
             {
                 stateMachine.ChangeState<State2>();
-                return Task.CompletedTask;
+                return;
             }
             _logger.LogInformation("Pending restart....");
-            return Task.CompletedTask;
+            stateMachine.SetStateData(this, await _dataSerializer.Serialize(_executionCount));
         }
     }
 
-    class State2 : State.WithoutData
+    class State2 : State
     {
         public override string Name => "restarting";
         private ILogger _logger;
@@ -108,12 +124,11 @@ class TestJob : StateMachineJob
             _logger.LogInformation("Restarting...");
 
             stateMachine.ChangeState<State3>();
-
             return Task.CompletedTask;
         }
     }
 
-    class State3 : State.WithoutData
+    class State3 : State
     {
         public override string Name => "starting";
         private ILogger _logger;
@@ -127,14 +142,17 @@ class TestJob : StateMachineJob
         {
             _logger.LogInformation("starting...");
 
-            stateMachine.ChangeState(null);
+            stateMachine.End();
 
             return Task.CompletedTask;
         }
     }
-    public TestJob(IServiceProvider serviceProvider) : base(serviceProvider)
-    {
 
+    private IDataSerializer _jobParamSerializer;
+    private string _webAppName;
+    public TestJob(IServiceProvider serviceProvider, IDataSerializer jobParamSerializer) : base(serviceProvider)
+    {
+        _jobParamSerializer = jobParamSerializer;
     }
 
     protected override Type GetStateType(string state)
@@ -145,5 +163,11 @@ class TestJob : StateMachineJob
         }
 
         return null;
+    }
+
+    public override async Task Configure(IJobDetail jobDetail)
+    {
+        _webAppName = await _jobParamSerializer.Deserialize<string>(jobDetail.Parameters);
+        await base.Configure(jobDetail);
     }
 }

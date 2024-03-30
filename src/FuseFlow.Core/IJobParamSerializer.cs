@@ -1,6 +1,6 @@
 namespace FuseFlow.Core;
 
-public interface IJobParamSerializer
+public interface IDataSerializer
 {
     Task<string> Serialize(object param);
     Task<T> Deserialize<T>(string param);

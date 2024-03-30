@@ -5,7 +5,7 @@ public class JobOrchestrator : IJobOrchestrator
 {
     private readonly IJobStore _jobStore;
     private readonly IServiceProvider _serviceProvider;
-    private IDictionary<string, IJobDetail> _activeJobs;
+    private IDictionary<string, IJobDetail> _activeJobs = new Dictionary<string, IJobDetail>();
 
     public JobOrchestrator(IJobStore jobStore, IServiceProvider serviceProvider)
     {
@@ -32,7 +32,7 @@ public class JobOrchestrator : IJobOrchestrator
             if (jobDetail.Job is null)
             {
                 // Initialise the job
-                jobDetail.Job = (IJob)_serviceProvider.GetRequiredService(jobDetail.JobType);
+                jobDetail.Job = (IJob)ActivatorUtilities.CreateInstance(_serviceProvider, jobDetail.JobType);
                 await jobDetail.Job.Configure(jobDetail);
             }
             // remove complete jobs
@@ -41,7 +41,8 @@ public class JobOrchestrator : IJobOrchestrator
                 RemoveActiveJob(jobDetail);
                 continue;
             }
-            await jobDetail.Job.Execute(stoppingToken, jobDetail.State);
+            await jobDetail.Job.Execute(stoppingToken);
+            jobDetail.CurrentState = jobDetail.Job.CurrentState;
 
         }
     }

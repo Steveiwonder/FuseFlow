@@ -7,5 +7,7 @@ public interface IJobStore
     IEnumerable<IJobDetail> GetCompleteJobs();
     void SetJobComplete(IJobDetail jobDetail);
     Task<string> AddJob(Type jobType, string parameters = null);
+
 }
+
 

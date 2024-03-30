@@ -1,12 +1,17 @@
 namespace FuseFlow.Core;
 
-public class InMemoryJobStore : IJobStore
+public class InMemoryJobStore : IJobStore, IJobStateStore
 {
     private IDictionary<string, InMemoryJob> _jobs = new Dictionary<string, InMemoryJob>();
     class InMemoryJob
     {
         public IJobDetail JobDetail { get; set; }
         public bool IsComplete { get; set; }
+    }
+
+    public InMemoryJobStore()
+    {
+
     }
 
     public Task<string> AddJob(Type jobType, string parameters = null)
@@ -22,7 +27,7 @@ public class InMemoryJobStore : IJobStore
             JobId = jobId,
             Parameters = parameters
         };
-
+        _jobs.Add(jobId, new InMemoryJob() { JobDetail = jobDetail });
 
         return Task.FromResult(jobId);
     }
@@ -49,18 +54,24 @@ public class InMemoryJobStore : IJobStore
         }
     }
 
-    public void AddJob(JobDetail jobDetail)
+    public void SetStateData(string jobId, string data)
     {
-        if (jobDetail is null)
+        if (!_jobs.ContainsKey(jobId))
         {
-            throw new ArgumentNullException(nameof(jobDetail));
+            throw new Exception($"Job id {jobId} does not exist");
         }
-        if (_jobs.ContainsKey(jobDetail.JobId))
+        _jobs[jobId].JobDetail.CurrentStateData = data;
+    }
+
+    public string GetStateData(string jobId)
+    {
+
+        if (!_jobs.ContainsKey(jobId))
         {
-            throw new Exception($"Job with id {jobDetail.JobId} already exists");
+            throw new Exception($"Job id {jobId} does not exist");
         }
 
-        _jobs.Add(jobDetail.JobId, new InMemoryJob() { JobDetail = jobDetail });
+        return _jobs[jobId].JobDetail.CurrentStateData;
     }
 }
 
