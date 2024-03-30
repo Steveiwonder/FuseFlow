@@ -71,5 +71,10 @@ public abstract class StateMachineJob : IJob
     }
 
     protected abstract Type GetStateType(string state);
+
+    public virtual Task Configure(IJobDetail jobDetail)
+    {
+        return Task.CompletedTask;
+    }
 }
 

@@ -1,0 +1,56 @@
+using Microsoft.Extensions.DependencyInjection;
+namespace FuseFlow.Core;
+
+public class JobOrchestrator : IJobOrchestrator
+{
+    private readonly IJobStore _jobStore;
+    private readonly IServiceProvider _serviceProvider;
+    private IDictionary<string, IJobDetail> _activeJobs;
+
+    public JobOrchestrator(IJobStore jobStore, IServiceProvider serviceProvider)
+    {
+        _jobStore = jobStore;
+        _serviceProvider = serviceProvider;
+    }
+
+    public async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        var jobs = _jobStore.GetIncompleteJobs();
+        foreach (var job in jobs)
+        {
+            if (_activeJobs.ContainsKey(job.JobId))
+            {
+                continue;
+            }
+            _activeJobs.Add(job.JobId, job);
+
+        }
+
+        foreach (var jobKey in _activeJobs.Keys.ToArray())
+        {
+            var jobDetail = _activeJobs[jobKey];
+            if (jobDetail.Job is null)
+            {
+                // Initialise the job
+                jobDetail.Job = (IJob)_serviceProvider.GetRequiredService(jobDetail.JobType);
+                await jobDetail.Job.Configure(jobDetail);
+            }
+            // remove complete jobs
+            if (jobDetail.Job.IsComplete)
+            {
+                RemoveActiveJob(jobDetail);
+                continue;
+            }
+            await jobDetail.Job.Execute(stoppingToken, jobDetail.State);
+
+        }
+    }
+
+    private void RemoveActiveJob(IJobDetail jobDetail)
+    {
+        _jobStore.SetJobComplete(jobDetail);
+        _activeJobs.Remove(jobDetail.JobId);
+    }
+
+}
+
