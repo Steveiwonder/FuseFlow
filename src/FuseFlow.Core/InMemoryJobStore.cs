@@ -21,7 +21,6 @@ public class InMemoryJobStore : IJobStore
             JobType = jobType,
             JobId = jobId,
             Parameters = parameters
-
         };
 
 

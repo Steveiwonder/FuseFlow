@@ -1,24 +1,23 @@
-using System.Text.Json;
-
 namespace FuseFlow.Core;
 
 public class JobDispatcher : IJobDispatcher
 {
     private readonly IJobStore _jobStore;
+    private readonly IJobParamSerializer _jobParamSerializer;
 
-    public JobDispatcher(IJobStore jobStore)
+    public JobDispatcher(IJobStore jobStore, IJobParamSerializer jobParamSerializer)
     {
         _jobStore = jobStore;
+        _jobParamSerializer = jobParamSerializer;
     }
-    public Task<string> Dispatch(Type jobType, Dictionary<string, object> parameters)
+    public async Task<string> Dispatch(Type jobType, object parameters)
     {
-        var serializedParams = JsonSerializer.Serialize(parameters);
-        return _jobStore.AddJob(jobType, serializedParams);
+        var serializedParams = await _jobParamSerializer.Serialize(parameters);
+        return await _jobStore.AddJob(jobType, serializedParams);
 
     }
-    public Task<string> Dispatch(IJob job, Dictionary<string, object> parameters)
+    public Task<string> Dispatch(IJob job, object parameters)
     {
         return Dispatch(job.GetType(), parameters);
     }
 }
-

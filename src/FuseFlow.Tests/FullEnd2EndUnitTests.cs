@@ -2,7 +2,7 @@
 
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-
+using FuseFlow.Core;
 namespace FuseFlow.Tests;
 
 public class FullEnd2EndUnitTests
@@ -15,19 +15,28 @@ public class FullEnd2EndUnitTests
         {
             return sp.GetRequiredService<ILogger<FullEnd2EndUnitTests>>();
         });
+
+        collection.AddSingleton<IJobDispatcher, JobDispatcher>();
+        collection.AddSingleton<IJobOrchestrator, JobOrchestrator>();
+        collection.AddSingleton<IJobStore, InMemoryJobStore>();
+        collection.AddSingleton<IJobParamSerializer, JsonJobParameterSerializer>();
         collection.AddLogging(configure =>
         {
             configure.AddConsole();
         });
         var serviceProvider = collection.BuildServiceProvider();
 
+
+        var jobDispatcher = serviceProvider.GetRequiredService<IJobDispatcher>();
+
         var job = new TestJob(serviceProvider);
         var beforeExecuteStates = new Dictionary<int, string>();
         var afterExecuteStates = new Dictionary<int, string>();
+        CancellationToken cancellationToken = CancellationToken.None;
         for (int i = 0; i < 5; i++)
         {
             beforeExecuteStates.Add(i, job.CurrentState);
-            await job.Execute(null);
+            await job.Execute(cancellationToken, null);
             afterExecuteStates.Add(i, job.CurrentState);
         }
 
@@ -71,7 +80,7 @@ class TestJob : StateMachineJob
         public override string Name => "pendingRestart";
 
 
-        public override  Task Execute(StateMachine stateMachine)
+        public override Task Execute(StateMachine stateMachine)
         {
             _executionCount++;
             if (_executionCount >= 3)
