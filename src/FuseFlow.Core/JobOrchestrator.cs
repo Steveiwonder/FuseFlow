@@ -15,6 +15,7 @@ public class JobOrchestrator : IJobOrchestrator
 
     public async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        using var scope = _serviceProvider.CreateScope();
         var jobs = _jobStore.GetIncompleteJobs();
         foreach (var job in jobs)
         {
@@ -32,7 +33,7 @@ public class JobOrchestrator : IJobOrchestrator
             if (jobDetail.Job is null)
             {
                 // Initialise the job
-                jobDetail.Job = (IJob)ActivatorUtilities.CreateInstance(_serviceProvider, jobDetail.JobType);
+                jobDetail.Job = (IJob)ActivatorUtilities.CreateInstance(scope.ServiceProvider, jobDetail.JobType);
                 await jobDetail.Job.Configure(jobDetail);
             }
             // remove complete jobs
