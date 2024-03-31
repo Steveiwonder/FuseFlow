@@ -1,16 +1,19 @@
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 namespace FuseFlow.Core;
 
 public class JobOrchestrator : IJobOrchestrator
 {
     private readonly IJobStore _jobStore;
     private readonly IServiceProvider _serviceProvider;
+    private readonly ILogger<JobOrchestrator> _logger;
     private IDictionary<string, IJobDetail> _activeJobs = new Dictionary<string, IJobDetail>();
 
-    public JobOrchestrator(IJobStore jobStore, IServiceProvider serviceProvider)
+    public JobOrchestrator(IJobStore jobStore, IServiceProvider serviceProvider, ILogger<JobOrchestrator> logger)
     {
         _jobStore = jobStore;
         _serviceProvider = serviceProvider;
+        _logger = logger;
     }
 
     public async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -29,21 +32,28 @@ public class JobOrchestrator : IJobOrchestrator
 
         foreach (var jobKey in _activeJobs.Keys.ToArray())
         {
-            var jobDetail = _activeJobs[jobKey];
-            if (jobDetail.Job is null)
+            try
             {
-                // Initialise the job
-                jobDetail.Job = (IJob)ActivatorUtilities.CreateInstance(scope.ServiceProvider, jobDetail.JobType);
-                await jobDetail.Job.Configure(jobDetail);
+                var jobDetail = _activeJobs[jobKey];
+                if (jobDetail.Job is null)
+                {
+                    // Initialise the job
+                    jobDetail.Job = (IJob)ActivatorUtilities.CreateInstance(scope.ServiceProvider, jobDetail.JobType);
+                    await jobDetail.Job.Configure(jobDetail);
+                }
+                // remove complete jobs
+                if (jobDetail.Job.IsComplete)
+                {
+                    RemoveActiveJob(jobDetail);
+                    continue;
+                }
+                await jobDetail.Job.Execute(stoppingToken);
+                jobDetail.CurrentState = jobDetail.Job.CurrentState;
             }
-            // remove complete jobs
-            if (jobDetail.Job.IsComplete)
+            catch (Exception ex)
             {
-                RemoveActiveJob(jobDetail);
-                continue;
+                _logger.LogError(ex, "ExecuteAsync");
             }
-            await jobDetail.Job.Execute(stoppingToken);
-            jobDetail.CurrentState = jobDetail.Job.CurrentState;
 
         }
     }
