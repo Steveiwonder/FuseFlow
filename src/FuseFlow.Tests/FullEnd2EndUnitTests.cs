@@ -12,6 +12,7 @@ public class FullEnd2EndUnitTests
     public async Task Test1Async()
     {
         IServiceCollection collection = new ServiceCollection();
+
         collection.AddSingleton<ILogger>(sp =>
         {
             return sp.GetRequiredService<ILogger<FullEnd2EndUnitTests>>();
@@ -31,7 +32,7 @@ public class FullEnd2EndUnitTests
         var jobOrchestrator = serviceProvider.GetRequiredService<IJobOrchestrator>();
         var jobDispatcher = serviceProvider.GetRequiredService<IJobDispatcher>();
         var jobStore = serviceProvider.GetRequiredService<IJobStore>();
-        await jobDispatcher.Dispatch<TestJob>("mytestwebapp");
+        await jobDispatcher.Dispatch<TestJob>(new TestJob.JobParameters() { ResourceGroupName = "Resourcegroup1", WebAppName = "MyWebApp" });
 
 
         var states = new List<string>();
@@ -69,9 +70,9 @@ public class FullEnd2EndUnitTests
     }
 }
 
-class TestJob : StateMachineJob
+class TestJob : StateMachineJob<TestJob.JobParameters>
 {
-    class State1 : State
+    class State1 : State<TestJob>
     {
 
         private int _executionCount = 0;
@@ -94,10 +95,13 @@ class TestJob : StateMachineJob
             {
                 _executionCount = await _dataSerializer.Deserialize<int>(stateMachine.GetStateData());
             }
+
         }
 
         public override async Task Execute(StateMachine stateMachine)
         {
+
+
             _executionCount++;
             if (_executionCount >= 3)
             {
@@ -106,10 +110,11 @@ class TestJob : StateMachineJob
             }
             _logger.LogInformation("Pending restart....");
             stateMachine.SetStateData(this, await _dataSerializer.Serialize(_executionCount));
+
         }
     }
 
-    class State2 : State
+    class State2 : State<TestJob>
     {
         public override string Name => "restarting";
         private ILogger _logger;
@@ -126,9 +131,11 @@ class TestJob : StateMachineJob
             stateMachine.ChangeState<State3>();
             return Task.CompletedTask;
         }
+
+
     }
 
-    class State3 : State
+    class State3 : State<TestJob>
     {
         public override string Name => "starting";
         private ILogger _logger;
@@ -148,11 +155,16 @@ class TestJob : StateMachineJob
         }
     }
 
-    private IDataSerializer _jobParamSerializer;
-    private string _webAppName;
-    public TestJob(IServiceProvider serviceProvider, IDataSerializer jobParamSerializer) : base(serviceProvider)
+    public class JobParameters
     {
-        _jobParamSerializer = jobParamSerializer;
+        public string WebAppName { get; set; }
+        public string ResourceGroupName { get; set; }
+    }
+
+
+
+    public TestJob(IServiceProvider serviceProvider) : base(serviceProvider)
+    {
     }
 
     protected override Type GetStateType(string state)
@@ -165,9 +177,4 @@ class TestJob : StateMachineJob
         return null;
     }
 
-    public override async Task Configure(IJobDetail jobDetail)
-    {
-        _webAppName = await _jobParamSerializer.Deserialize<string>(jobDetail.Parameters);
-        await base.Configure(jobDetail);
-    }
 }

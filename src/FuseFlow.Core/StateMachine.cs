@@ -1,5 +1,6 @@
 
 
+using System.Reflection;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -14,13 +15,15 @@ public class StateMachine
     public IState CurrentState => _currentState;
     private Action<string> _setStateData;
     private Func<string> _getStateData;
+    private Func<StateMachineJob> _getJob;
 
-    public StateMachine(ILogger logger, IServiceProvider serviceProvider, Func<string> getStateData, Action<string> setStateData)
+    public StateMachine(ILogger logger, IServiceProvider serviceProvider, Func<string> getStateData, Action<string> setStateData, Func<StateMachineJob> getJob)
     {
         _logger = logger;
         _serviceProvider = serviceProvider;
         _getStateData = getStateData;
         _setStateData = setStateData;
+        _getJob = getJob;
     }
 
 
@@ -34,6 +37,30 @@ public class StateMachine
         ChangeState(typeof(TState));
     }
 
+    private bool IsAssignableToGenericType(object obj, Type genericType)
+    {
+        Type type = obj.GetType();
+        while (type != null && type != typeof(object))
+        {
+            var cur = type.IsGenericType ? type.GetGenericTypeDefinition() : type;
+            if (genericType == cur)
+            {
+                return true;
+            }
+            type = type.BaseType;
+        }
+
+        foreach (var i in obj.GetType().GetInterfaces())
+        {
+            if (i.IsGenericType && i.GetGenericTypeDefinition() == genericType)
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void ChangeState(Type type)
     {
         if (type == null)
@@ -44,6 +71,11 @@ public class StateMachine
 
         ClearStateData();
         IState newState = CreateState(type);
+        if (IsAssignableToGenericType(newState, typeof(State<>)))
+        {
+            MethodInfo method = newState.GetType().GetMethod("SetJob");
+            method?.Invoke(newState, new object[] { _getJob() });
+        }
         _currentState?.Exit(this);
         _currentState = newState;
         _currentState.Enter(this);

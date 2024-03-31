@@ -2,6 +2,27 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace FuseFlow.Core;
+
+public abstract class StateMachineJob<TParam> : StateMachineJob where TParam : class
+{
+    private TParam _params;
+    protected StateMachineJob(IServiceProvider serviceProvider) : base(serviceProvider)
+    {
+    }
+
+    public async Task<TParam> GetParams()
+    {
+        if (string.IsNullOrEmpty(JobDetail.Parameters))
+        {
+            return default;
+        }
+        if (_params != default)
+        {
+            return _params;
+        }
+        return _params = await DataSerializer.Deserialize<TParam>(JobDetail.Parameters);
+    }
+}
 public abstract class StateMachineJob : IJob
 {
     protected ILogger Logger;
@@ -24,7 +45,8 @@ public abstract class StateMachineJob : IJob
         }, (data) =>
         {
             _jobStateStore.SetStateData(JobDetail.JobId, data);
-        });
+        },
+        () => JobDetail.Job as StateMachineJob);
     }
 
 
@@ -79,6 +101,11 @@ public abstract class StateMachineJob : IJob
         Logger.LogInformation($"Initial state set {CurrentState}");
 
         return Task.CompletedTask;
+    }
+
+    public T GetJob<T>() where T : StateMachineJob
+    {
+        return JobDetail?.Job as T;
     }
 }
 
