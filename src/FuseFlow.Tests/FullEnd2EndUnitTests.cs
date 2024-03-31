@@ -101,7 +101,6 @@ class TestJob : StateMachineJob<TestJob.JobParameters>
         public override async Task Execute(StateMachine stateMachine)
         {
 
-
             _executionCount++;
             if (_executionCount >= 3)
             {

@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace FuseFlow.Core;
 
+public record Transition(string From, string To);
 public class StateMachine
 {
     private IState _currentState;
@@ -16,6 +17,8 @@ public class StateMachine
     private Action<string> _setStateData;
     private Func<string> _getStateData;
     private Func<StateMachineJob> _getJob;
+    public IReadOnlyList<Transition> TransitionHistory => _transitionHistory.AsReadOnly<Transition>();
+    private List<Transition> _transitionHistory = new List<Transition>();
 
     public StateMachine(ILogger logger, IServiceProvider serviceProvider, Func<string> getStateData, Action<string> setStateData, Func<StateMachineJob> getJob)
     {
@@ -76,6 +79,7 @@ public class StateMachine
             MethodInfo method = newState.GetType().GetMethod("SetJob");
             method?.Invoke(newState, new object[] { _getJob() });
         }
+        _transitionHistory.Add(new Transition(_currentState?.Name, newState.Name));
         _currentState?.Exit(this);
         _currentState = newState;
         _currentState.Enter(this);
@@ -87,6 +91,7 @@ public class StateMachine
         {
             return;
         }
+        _transitionHistory.Add(new Transition(_currentState.Name, null));
         _currentState.Exit(this);
         _currentState = null;
     }
